@@ -1,5 +1,6 @@
 package com.example.onlinequizliveclass4;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -10,15 +11,35 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.example.onlinequizliveclass4.model.LoadDataCallback;
+import com.example.onlinequizliveclass4.model.Quiz;
+import com.example.onlinequizliveclass4.model.Quizzes;
 import com.example.onlinequizliveclass4.model.User;
 import com.example.onlinequizliveclass4.net.WebServices;
 
+import java.util.ArrayList;
+
 public class QuizListActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
+
+    private static final String TAG = QuizListActivity.class.getSimpleName();
+
+    private View mMainLayout;
+    private ListView mQuizzesListView;
+    private ProgressBar mProgressBar;
+    private View mRetryLayout;
+
+    private Quizzes mQuizzes = Quizzes.getInstance();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,6 +68,79 @@ public class QuizListActivity extends AppCompatActivity
 
         nameTextView.setText(User.loggedInUser.name);
         emailTextView.setText(User.loggedInUser.username);
+
+        setupViews();
+        loadQuizzes();
+    }
+
+    private void setupViews() {
+        mMainLayout = findViewById(R.id.drawer_layout);
+
+        mQuizzesListView = (ListView) findViewById(R.id.quizzes_list_view);
+        mProgressBar = (ProgressBar) findViewById(R.id.progress_bar);
+        mRetryLayout = findViewById(R.id.retry_layout);
+
+        final ArrayAdapter<Quiz> adapter = new ArrayAdapter<>(
+                QuizListActivity.this,
+                R.layout.quiz_item,
+                new ArrayList<Quiz>()
+        );
+        mQuizzesListView.setAdapter(adapter);
+        mQuizzesListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Quiz selectedQuiz = adapter.getItem(position);
+
+                Toast.makeText(
+                        QuizListActivity.this,
+                        selectedQuiz.toString(),
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                Intent intent = new Intent(QuizListActivity.this, QuizActivity.class);
+                intent.putExtra(QuizActivity.KEY_EXTRA_QUIZ_ID, selectedQuiz.quizId);
+                startActivity(intent);
+            }
+        });
+
+        Button retryButton = (Button) findViewById(R.id.retry_button);
+        retryButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadQuizzes();
+            }
+        });
+    }
+
+    private void loadQuizzes() {
+        mMainLayout.setBackgroundResource(0); // remove background
+        mProgressBar.setVisibility(View.VISIBLE);
+        mQuizzesListView.setVisibility(View.GONE);
+        mRetryLayout.setVisibility(View.GONE);
+
+        mQuizzes.load(new LoadDataCallback() {
+            @Override
+            public void onFailure(String errMessage) {
+                mMainLayout.setBackgroundResource(0); // remove background
+                mProgressBar.setVisibility(View.GONE);
+                mQuizzesListView.setVisibility(View.GONE);
+                mRetryLayout.setVisibility(View.VISIBLE);
+
+                TextView errorMessageTextView = (TextView) findViewById(R.id.error_message);
+                errorMessageTextView.setText(errMessage);
+            }
+
+            @Override
+            public void onSuccess() {
+                mMainLayout.setBackgroundResource(R.drawable.background); // set background
+                mProgressBar.setVisibility(View.GONE);
+                mQuizzesListView.setVisibility(View.VISIBLE);
+                mRetryLayout.setVisibility(View.GONE);
+
+                ArrayAdapter<Quiz> adapter = (ArrayAdapter<Quiz>) mQuizzesListView.getAdapter();
+                adapter.addAll(mQuizzes.getList());
+            }
+        });
     }
 
     @Override
